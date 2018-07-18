@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"fmt"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
@@ -13,7 +12,6 @@ import (
 
 var (
 	log            *logrus.Logger
-	mets           map[string]*prometheus.Desc
 	tokens = kingpin.Flag("tokens", "Tokens api github. Example; -t user:token1,user:token2,user:token3").Short('t').Required().String()
 )
 
@@ -34,6 +32,7 @@ func getHTTPResponse(url string, token string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	return resp, err
 }
 
@@ -75,22 +74,24 @@ func main() {
 	kingpin.Parse()
 
 	if ( *tokens != "" ) {
+		// It would be neccesary to ckech argument
 		// WEB SERVER
-		// Setup HTTP handler
 		http.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(getMetrics(*tokens)))
 		})
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`<html>
-							<head><title>Github Exporter</title></head>
+							<head><title>Reqgithub Exporter</title></head>
 							<body>
-								<h1>GitHub Prometheus Metrics Exporter</h1>
-								<p>For more information, visit <a href=https://github.com/infinityworks/github-exporter>GitHub</a></p>
+								<h1>Request Github Prometheus Metrics Exporter</h1>
+								<p>For more information, visit <a href=https://github.com/dcano-sysadmin/reqgithub-exporter>GitHub</a></p>
 								<p><a href='/metrics'>Metrics</a></p>
 							</body>
 							</html>
 						`))
 		})
 		log.Fatal(http.ListenAndServe(":9171", nil))
+	} else {
+		kingpin.HelpFlag.Short('h')
 	}
 }
