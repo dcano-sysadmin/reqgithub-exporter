@@ -36,22 +36,28 @@ func getHTTPResponse(url string, token string) (*http.Response, error) {
 	return resp, err
 }
 
-func getRateLimit(token string) (string) {
+func getRateLimit(token string) (string,error) {
 	baseURL :="https://api.github.com"
 	rateEndPoint := "/rate_limit"
 
 	resp, err := http.Get(baseURL+rateEndPoint+"?access_token="+token)
+
+	defer resp.Body.Close()
 	
+	if err != nil {
+		return "", err
+	}
+
 	if ( err != nil  || resp.StatusCode == 404 ) {
-		fmt.Errorf("Error response github API for Rate Limit")
+		return "", err
 	}
 	
 	rem, err := strconv.ParseFloat(resp.Header.Get("X-RateLimit-Remaining"), 64)
 	
 	if err != nil {
-		fmt.Errorf("Error getting Rate Limit")
+		return "", err
 	}
-	return strconv.FormatFloat(rem, 'f', 2, 64)
+	return strconv.FormatFloat(rem, 'f', 2, 64),err
 }
 
 func getMetrics(tokenArg string) (string) {
@@ -62,7 +68,11 @@ func getMetrics(tokenArg string) (string) {
 	t := 0
 	for _,  token := range arrayTokens {
 		s := strings.Split(token, ":")
-		salida += "available_requests{token=\""+strconv.Itoa(t)+"\",user=\""+s[0]+"\"} "+getRateLimit(s[1])+`
+		rate,err := getRateLimit(s[1])
+		if ( err != nil && rate != "" ) {
+			fmt.Println(err)
+		}
+		salida += "available_requests{token=\""+strconv.Itoa(t)+"\",user=\""+s[0]+"\"} "+rate+`
 `
 		t+=1
 	}
