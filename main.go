@@ -5,9 +5,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"fmt"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
-	"time"
 	"strings"
 	"strconv"
+	"time"
 )
 
 var (
@@ -15,49 +15,34 @@ var (
 	tokens = kingpin.Flag("tokens", "Tokens api github. Example; -t user:token1,user:token2,user:token3").Short('t').Required().String()
 )
 
-// getHTTPResponse handles the http client creation, token setting and returns the *http.response
-func getHTTPResponse(url string, token string) (*http.Response, error) {
-	client := &http.Client{
-		Timeout: time.Second * 10,
-	}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	// If a token is present, add it to the http.request
-	if token != "" {
-		req.Header.Add("Authorization", "token "+token)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	return resp, err
-}
+func getRateLimit(user string,token string) (string,error) {
+	baseURL :="https://api.github.com/rate_limit"
+	rate := ""
 
-func getRateLimit(token string) (string,error) {
-	baseURL :="https://api.github.com"
-	rateEndPoint := "/rate_limit"
+	timeout := time.Duration(5 * time.Second)
+	client := http.Client{
+		Timeout: timeout,
+	}
 
-	resp, err := http.Get(baseURL+rateEndPoint+"?access_token="+token)
-
-	defer resp.Body.Close()
+	request, err := http.NewRequest("GET",baseURL,nil)
+	request.Header.Add("Authorization", "token "+token)
 	
-	if err != nil {
-		return "", err
+	resp, err := client.Do(request)
+	defer resp.Body.Close()
+
+	for name, values := range resp.Header {
+		for _, value := range values {
+			if (name == "X-Ratelimit-Remaining") {
+				rate = value
+			}
+		}
 	}
 
 	if ( err != nil  || resp.StatusCode == 404 ) {
 		return "", err
 	}
 	
-	rem, err := strconv.ParseFloat(resp.Header.Get("X-RateLimit-Remaining"), 64)
-	
-	if err != nil {
-		return "", err
-	}
-	return strconv.FormatFloat(rem, 'f', 2, 64),err
+	return rate,nil
 }
 
 func getMetrics(tokenArg string) (string) {
@@ -68,7 +53,7 @@ func getMetrics(tokenArg string) (string) {
 	t := 0
 	for _,  token := range arrayTokens {
 		s := strings.Split(token, ":")
-		rate,err := getRateLimit(s[1])
+		rate,err := getRateLimit(s[0],s[1])
 		if ( err != nil && rate != "" ) {
 			fmt.Println(err)
 		}
